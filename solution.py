@@ -1,0 +1,2 @@
+class PostgresTransfer:
+    pass
