@@ -3,7 +3,7 @@ from urllib.parse import urlparse
 import psycopg2
 import pytest
 
-from .solution import PostgresTransfer
+from solution import PostgresTransfer
 
 
 def get_conn(uri):
