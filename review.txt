@@ -1,0 +1,56 @@
+diff --git a/solution.py b/solution.py
+index a1b70df..b9eb2c2 100644
+--- a/solution.py
++++ b/solution.py
+@@ -19,18 +19,19 @@ class PostgresTransfer:
+         # In this way, resources will be saved if the process runs frequently.
+         try:
+             data_src = self.run(conn_src, self.src_sql, True)
+             data_dts = self.run(conn_dts, f"select bid, fid, price from {self.dst_table_name}", True)
++            # -> Tables cannot be compared in this way because order of returned rows is not guaranteed (because there is no ORDER BY in the query). You wont see a problem in most cases but it will break if there is some differece in implementation (e.g. two different versions fo database) or just data are stored in different order for whaever reason.
+             if data_dts == data_src:
+                 return
+         except:
+@@ -38,10 +39,15 @@ class PostgresTransfer:
+
+         try:
+             # create a backup in case the insert fails, the data will be restored
++            # -> There is no need to create a backup because if insert fails database will rollback the query and make no change to the database.
+             self.run(conn_dts, f"create table if not exists {self.dst_table_name}_backup as (select * from {self.dst_table_name});")
+             self.run(conn_dts, f"truncate table {self.dst_table_name};")
+         except:
++            # - Each .run method executes the SQL query in a new session because of `conn.cursor()` so there is nothing to rollback, queries would have to use the same cursor for this to have any effect
+             self.run(conn_dts, "rollback")
++            # -> Assignment says that table structure should be copied from source database. PostgresTransfer should work for any table, not only flights.
++            # -> What happens if no indexes are provided? I am sure there are tables without indexes
++            # -> Using exceptions for controlling standard flow is a bad practice. And caching all exceptions even worse. Because if the first part fails with some connection error it makes no sense to execute the second part. Exceptions should be used only for unexpected situations like cat cutting a cable not a standard behaviour.
+             self.run(conn_dts, f"""
+                 create table if not exists {self.dst_table_name} (
+                     bid bigint,
+@@ -53,10 +59,13 @@ class PostgresTransfer:
+
+         try:
+             data_src = self.run(conn_src, self.src_sql, True)
++            # -> This cannot work for all data types, for example a TIMESTAMP column will serialize like `datetime.datetime(2020, 3, 13, 0, 0)` which cannot be parsed by postgres database as a valid date on insert
++            # -> There is also a problem with tables that have single column they will serialize like `("Palma",)` which is not a valid SQL (notice colomn at after the value)
++            # -> It is always a good idea not to write things like this yourself because there will be mistakes and use some existing solution, for example function `psycopg2.extras.execute_values` or library `sqlalchemy`
+             records_template = str(data_src).strip('[]')
+             self.run(conn_dts, f"insert into {self.dst_table_name}(bid, fid, price) values {records_template};")
+             self.run(conn_dts, f"drop table if exists {self.dst_table_name}_backup;")
+         except:
+             self.run(conn_dts, "rollback")
++            # -> As I already mentioned those statements are not executed in a single transaction so it is possible that the first one (drop) executes but the second one (rename) wont. This could cause problems in a rare cases when execution is for any reason haled in the middle.
+             self.run(conn_dts, f"drop table if exists {self.dst_table_name};")
+             self.run(conn_dts, f"alter table if exists {self.dst_table_name}_backup rename to {self.dst_table_name[7:]};")
+diff --git a/tests_milton.py b/tests_milton.py
+index 2e80293..d8ac8bd 100644
+--- a/tests_milton.py
++++ b/tests_milton.py
+@@ -56,6 +56,7 @@ def test_transfer_simple(transfer):
+     """)
+
+     # check if the backup is working correctly
++    # -> If there is some problem with updating the data it would be nice to acknowledge this with exception or at least a warning that data were not copied. If thi was used in a production it would silently not copy the data and nobody would notice that because of one row new/updated rows are not copied.
+     transfer.execute()
+     data = run(
+         ANAL_DB_URI,
