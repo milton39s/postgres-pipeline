@@ -1,16 +1,4 @@
-# ENTRYTASK BIG DATA ENGINEER
-
-Hello!
-
-Prepare yourself, you will be writing code! Task itself is not so hard.
-There are no catch questions or anything. Main point is to find out your 
-design thinking (especially software), problem solving capabilities and some
-basic usage of db.
-
-Alright, let's get to it!
-
-
-# Task
+# Task: Postgres Pipeline
 
 Imagine you have 2 databases. One corresponds to application database (app_db) and
 the second one to analytical database (anal_db). In order for analytics guys to work with
@@ -69,3 +57,8 @@ If you would find out some bug in tests/docker etc. or you feel like you are stu
 help. Don't hesitate to contact us. 
 
 If you give us little review about the task itself, we will be happy.
+
+Prepare yourself, you will be writing code! Task itself is not so hard.
+There are no catch questions or anything. Main point is to find out your 
+design thinking (especially software), problem solving capabilities and some
+basic usage of db.
